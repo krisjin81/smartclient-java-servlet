@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="ISO-8859-1"?>
+<web-app>
+	<welcome-file-list>
+	    <welcome-file>index.html</welcome-file>	    
+  	</welcome-file-list>
+  
+	<servlet>
+		<servlet-name>
+			isomorphic
+		</servlet-name>
+		<servlet-class>
+			Process
+		</servlet-class>
+	</servlet>
+	
+	<servlet-mapping>
+		<servlet-name>isomorphic</servlet-name>
+		<url-pattern>*.sc</url-pattern>
+	</servlet-mapping>
+	
+	<session-config>
+		<session-timeout>30</session-timeout>
+	</session-config>
+</web-app>
