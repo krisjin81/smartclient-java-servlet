@@ -31,9 +31,9 @@ public class DSResponse {
 		public void setEndRow(int nEndRow) {
 			this.nEndRow = nEndRow;
 		}
-		
 		public int getTotalRows() {
 			return nTotalRows;
+			
 		}
 		
 		public void setTotalRows(int nTotalRows) {

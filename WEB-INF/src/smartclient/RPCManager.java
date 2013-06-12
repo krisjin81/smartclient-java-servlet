@@ -164,7 +164,7 @@ public class RPCManager {
 				//execute the request and get the response
 				DSResponse ds_res = ds_req.execute();
 				// safeguard, if was null, create an empty one with failed status
-				if(ds_res == null )
+				if(ds_res == null )					 
 				{
 					ds_res = new DSResponse();
 					ds_res.setStatus(-1);

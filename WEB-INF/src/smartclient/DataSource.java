@@ -3,15 +3,14 @@ package smartclient;
 import java.io.BufferedReader;
 import java.io.FileReader;
 import java.io.IOException;
-import java.net.URL;
 import java.sql.Connection;
 import java.sql.DriverManager;
+import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.Iterator;
-import java.util.Properties;
 
 import javax.servlet.http.HttpServletRequest;
 
@@ -172,6 +171,7 @@ public class DataSource {
 		dsResponse.setStatus(0);
 		return dsResponse;
 	}
+	
 	protected DSResponse add(DSRequest dsRequest) throws SQLException
 	{		
 		// get the table name
@@ -216,16 +216,27 @@ public class DataSource {
 	{
 		// get the DataSource
 		String strDataSource = dsRequest.getDataSource();
-		JSONObject jsQueryResult;
+		JSONObject jsQueryResult = new JSONObject();
 		if ( dsRequest.getAdvancedCriteria() == null)
 		{
 			jsQueryResult = this.buildStandardCriteria(dsRequest);
 		} else
 		{
-			
+			jsQueryResult = this.buildAdvancedCriteria(dsRequest);
 		}
-		//String strWhere =  jsQueryResult.getString("query");
-		String strQuery = "SELECT * FROM " + strDataSource.toString();// + strWhere.toString();
+		
+		String strWhere = "";
+		String strQuery = "";
+		
+		if ( jsQueryResult.containsKey("query"))
+			strWhere = jsQueryResult.getString("query");
+		else
+			strWhere = "";
+		
+		if ( strWhere != "" )
+			strQuery = "SELECT * FROM " + strDataSource.toString() + " WHERE " + strWhere;
+		else
+			strQuery = "SELECT * FROM " + strDataSource.toString();
 		
 		// sort by
 		if ( dsRequest.getSortBy() != null )
@@ -244,8 +255,26 @@ public class DataSource {
 		Statement stmt = null;
 		ResultSet rs = null;
 		Connection con = DriverManager.getConnection(JDBC_Connection.URL,JDBC_Connection.USER, JDBC_Connection.PASSWORD);
-		stmt = con.createStatement();
-		rs = stmt.executeQuery(strQuery);
+		
+		if ( jsQueryResult.containsKey("values") && jsQueryResult.getJSONArray("values").size() > 0 )
+		{
+			PreparedStatement psWhere = con.prepareStatement(strQuery);
+			JSONArray jaValues = jsQueryResult.getJSONArray("values");
+			
+			for ( int i = 0; i < jaValues.size(); i++ )
+			{
+				int nIndex = i + 1;
+				String strVal = jaValues.getString(i);
+				
+				psWhere.setString(nIndex,  strVal);
+			}
+			
+			rs = psWhere.executeQuery();
+		}else
+		{ 	 
+			stmt = con.createStatement();
+			rs = stmt.executeQuery(strQuery);
+		}
 		// DSResponse
 		JSONArray ja = new JSONArray();
 		ja = ResultSetConverter.convert(rs); 
@@ -274,6 +303,218 @@ public class DataSource {
 		
 	}
 	
+	private JSONObject buildAdvancedCriteria(DSRequest dsRequest)
+	{
+		// get the advanced criteria
+		JSONObject joAdvancedCriterias = dsRequest.getAdvancedCriteria();
+		JSONObject joCriteras = new JSONObject();
+		if ( joAdvancedCriterias != null )
+		{
+			joCriteras = this.buildCriterion(joAdvancedCriterias);			
+		
+		}
+		return joCriteras;		
+	}
+	
+	private JSONObject buildCriterion( JSONObject joCriterias )
+	{
+		JSONArray jaCriteria = joCriterias.getJSONArray("criteria");
+		String strOperator = joCriterias.getString("operator");
+		ArrayList<String> laValues = new ArrayList<String>();
+		String strResultQuery = "";
+		
+		for( int i = 0; i < jaCriteria.size(); i++ )
+		{
+			JSONObject joC = jaCriteria.getJSONObject(i);
+			
+			String strFieldName = "", strVal= "", strOp = "", strStart= "", strEnd= "", strQuery = "";
+			JSONArray jaSubCritera;
+			// fieldName 
+			if ( joC.containsKey("fieldName"))
+				strFieldName = joC.getString("fieldName");
+			// operator
+			if ( joC.containsKey("operator"))
+				strOp = joC.getString("operator");
+			// value
+			if ( joC.containsKey("value") )
+			{
+				strVal = joC.getString("value");
+				
+				if ( strVal.equals("TRUE"))
+					strVal = "1";
+				else if ( strVal.equals("FALSE"))
+					strVal = "0";				
+			}
+			// start
+			if ( joC.containsKey("start"))
+				strStart = joC.getString("start");			
+			// end
+			if ( joC.containsKey("end"))
+				strEnd = joC.getString("end");
+			// criteria
+			if ( joC.containsKey("criteria"))
+			{
+				jaSubCritera = joC.getJSONArray("criteria");
+			} else
+			{
+				jaSubCritera = null;
+			}
+			
+			if ( jaSubCritera == null )
+			{
+				if ( strOp.equals("equals") )
+				{
+					strQuery = strFieldName + " = ?";
+					laValues.add(strVal);
+				}else if ( strOp.equals("notEqual") )
+				{
+					strQuery = strFieldName + " != ?";
+					laValues.add(strVal);
+				}else if ( strOp.equals("iEquals") )
+				{
+					strQuery = "UPPER(" + strFieldName + ") = ?";
+					laValues.add( "UPPER('" + strVal + "')" );
+				}else if ( strOp.equals("iNotEqual") )
+				{
+					strQuery = "UPPER(" + strFieldName + ") != ?";
+					laValues.add( "UPPER('" + strVal + "')" );
+				}else if ( strOp.equals("greaterThan") )
+				{
+					strQuery = strFieldName + " > ?";
+					laValues.add(strVal);
+				}else if ( strOp.equals("lessThan") )
+				{
+					strQuery = strFieldName + " < ?";
+					laValues.add(strVal);
+				}else if ( strOp.equals("greaterOrEqual") )
+				{
+					strQuery = strFieldName + " >= ?";
+					laValues.add(strVal);
+				}else if ( strOp.equals("lessOrEqual") )
+				{
+					strQuery = strFieldName + " <= ?";
+					laValues.add(strVal);
+				}else if ( strOp.equals("contains") )
+				{
+					strQuery = strFieldName + " LIKE ?";
+					laValues.add("%" + strVal + "%");
+				}else if ( strOp.equals("startsWith") )
+				{
+					strQuery = strFieldName + " LIKE ?";
+					laValues.add( "'" + strVal + "%");
+				}else if ( strOp.equals("endsWith") )
+				{
+					strQuery = strFieldName + " LIKE ?";
+					laValues.add( "%" + strVal + "'" );
+				}else if ( strOp.equals("iContains") )
+				{
+					strQuery = strFieldName + " LIKE ?";
+					laValues.add( "%" + strVal+ "%" );
+				}else if ( strOp.equals("iStartsWith") )
+				{
+					strQuery = "UPPER(" + strFieldName + ") LIKE ?";
+					laValues.add( "UPPER('" + strVal + "%)" );
+				}else if ( strOp.equals("iEndsWith") )
+				{
+					strQuery = "UPPER(" + strFieldName + ") LIKE ?";
+					laValues.add( "UPPER(%" + strVal + "')" );
+				}else if ( strOp.equals("notContains") )
+				{
+					strQuery = strFieldName + " NOT LIKE ?";
+					laValues.add("%" + strVal + "%");
+				}else if ( strOp.equals("notStartsWith") )
+				{
+					strQuery = strFieldName + " NOT LIKE ?";
+					laValues.add( "'" + strVal + "%");
+				}else if ( strOp.equals("notEndsWith") )
+				{
+					strQuery = strFieldName + " NOT LIKE ?";
+					laValues.add( "%" + strVal + "'" );
+				}else if ( strOp.equals("iNotContains") )
+				{
+					strQuery = "UPPER(" + strFieldName + ") NOT LIKE ?";
+					laValues.add( "UPPER(%" + strVal + "%)" );
+				}else if ( strOp.equals("iNotStartsWith") )
+				{
+					strQuery = "UPPER(" + strFieldName + ") NOT LIKE ?";
+					laValues.add( "UPPER('" + strVal + "%)" );
+				}else if ( strOp.equals("iNotEndsWith") )
+				{
+					strQuery = "UPPER(" + strFieldName + ") NOT LIKE ?";
+					laValues.add( "UPPER(%" + strVal + "')" );
+				}else if ( strOp.equals("isNull") )
+				{
+					strQuery = strFieldName + " IS NULL";
+				}else if ( strOp.equals("notNull") )
+				{
+					strQuery = strFieldName + " IS NOT NULL";
+				}else if ( strOp.equals("equalsField") )
+				{
+					strQuery = strFieldName + " LIKE ?";
+					laValues.add( "CONCAT('" + strVal + "', %)" );
+				}else if ( strOp.equals("iEqualsField") )
+				{
+					strQuery = "UPPER(" + strFieldName + ") LIKE ?";
+					laValues.add( "UPPER(CONCAT('" + strVal + "', %))" );
+				}else if ( strOp.equals("iNotEqualField") )
+				{
+					strQuery = "UPPER(" + strFieldName + ") NOT LIKE ?";
+					laValues.add( "UPPER(CONCAT('" + strVal + "', %))" );
+				}else if ( strOp.equals("notEqualField") )
+				{
+					strQuery = strFieldName + " NOT LIKE ?";
+					laValues.add( "CONCAT('" + strVal + "', %)" );
+				}else if (strOp.equals("greaterThanField"))
+				{
+					strQuery = strFieldName + " > ?";
+					laValues.add( "CONCAT('" + strVal + "', %)" );
+				}else if (strOp.equals("lessThanField"))
+				{
+					strQuery = strFieldName + " < ?";
+					laValues.add( "CONCAT('" + strVal + "', %)" );
+				}else if ( strOp.equals("greaterOrEqualField"))
+				{
+					strQuery = strFieldName + " >= ?";
+					laValues.add( "CONCAT('" + strVal + "', %)" );
+				}else if ( strOp.equals("lessOrEqualField"))
+				{
+					strQuery = strFieldName + " <= ?";
+					laValues.add( "CONCAT('" + strVal + "', %)" );
+				}else if ( strOp.equals("iBetweenInclusive"))
+				{
+					strQuery = strFieldName + " BETWEEN ? AND ?";
+					laValues.add(strStart);
+					laValues.add(strEnd);
+				}else if ( strOp.equals("iBetweenInclusive"))
+				{
+					strQuery = strFieldName + " BETWEEN ? AND ?";
+					laValues.add(strStart);
+					laValues.add(strEnd);
+				}
+				strResultQuery += strQuery + " " +  strOperator + " ";
+			} else
+			{
+				String strTemp = strResultQuery;
+				
+				JSONObject joTemp = this.buildCriterion(joC);
+				strResultQuery = strTemp + " ( " + joTemp.getString("query") + " ) " + strOperator + " ";
+				JSONArray jaValues = joTemp.getJSONArray("values");
+				
+				for ( int j = 0; j < jaValues.size(); j++ )
+				{
+					String strTempVal = jaValues.getString(i);
+					laValues.add(strTempVal);
+				} 
+			}			
+		}
+		String strResult = strResultQuery.substring( 0, strResultQuery.lastIndexOf(strOperator) );
+		
+		JSONObject joAdvancedCriteria = new JSONObject();
+		joAdvancedCriteria.put( "query", strResult );
+		joAdvancedCriteria.put( "values", laValues );
+		return joAdvancedCriteria;
+	}
+	
 	private JSONObject buildStandardCriteria(DSRequest dsRequest)
 	{
 		JSONObject jsResult = new JSONObject();
@@ -282,7 +523,7 @@ public class DataSource {
 		ArrayList<String> alValues = new ArrayList<String>();		 
 		if ( dsRequest.checktDataKeys() == false )
 		{
-			strQuery = " WHERE ";
+			strQuery = "";
 			JSONObject joData = dsRequest.getData();
 			Iterator<?> iKeys = joData.keys();
 			while( iKeys.hasNext() ){
@@ -298,7 +539,7 @@ public class DataSource {
 		}
 		
 		jsResult.put("query", strResultQuery);		
-		jsResult.put("value", alValues);
+		jsResult.put("values", alValues);
 		return jsResult;
 	}
 	 

@@ -52,7 +52,8 @@ public class DSRequest {
 			JSONObject joData = JSONObject.fromObject(strData);
 			this.setData(joData);
 		}
-				
+			
+		
 		if ( jsonObject.containsKey("textMatchStyle") == true )
 		{
 			String strTextMatchStyle = jsonObject.getString("textMatchStyle");

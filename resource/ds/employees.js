@@ -1,5 +1,5 @@
 isc.RestDataSource.create({
-    "ID": "employees",
+    "ID": "employee",
     "fields": [
         {"name": "Name", "title": "Name", "type": "text", "length": "128" },
         {"name": "EmployeeId", "title": "Employee ID", "type": "integer", "primaryKey": "true", "required": "true" },
@@ -20,9 +20,9 @@ isc.RestDataSource.create({
 
     "dataFormat": "json",    
     "operationBindings": [
-            { "operationType": "fetch", "dataProtocol": "postMessage", "dataURL": "process.php" },
-            { "operationType": "add", "dataProtocol": "postMessage", "dataURL": "process.php" },
-            { "operationType": "update", "dataProtocol": "postMessage", "dataURL": "process.php" },
-            { "operationType": "remove", "dataProtocol": "postMessage", "dataURL": "process.php" }
+            { "operationType": "fetch", "dataProtocol": "postMessage", "dataURL": "Process.sc" },
+            { "operationType": "add", "dataProtocol": "postMessage", "dataURL": "Process.sc" },
+            { "operationType": "update", "dataProtocol": "postMessage", "dataURL": "Process.sc" },
+            { "operationType": "remove", "dataProtocol": "postMessage", "dataURL": "Process.sc" }
         ]
 });
