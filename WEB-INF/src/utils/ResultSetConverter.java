@@ -57,7 +57,11 @@ public static JSONArray convert(ResultSet rs) throws SQLException,
 		            } else if (rsmd.getColumnType(i) == java.sql.Types.TIMESTAMP) {
 		                //obj.put(column_name, rs.getTimestamp(column_name));
 		            	String strDate = rs.getString(column_name);
-		            	obj.put(column_name, strDate.substring(0, strDate.indexOf(".")));
+		            	if ( strDate != null )		            	
+		            		obj.put(column_name, strDate.substring(0, strDate.indexOf(".")));
+		            	else
+		            		obj.put(column_name, "");
+		            	
 		            } else if (rsmd.getColumnType(i) == java.sql.Types.BINARY) {
 		                obj.put(column_name, rs.getBytes(column_name));
 		            } else if (rsmd.getColumnType(i) == java.sql.Types.VARBINARY) {
@@ -83,7 +87,8 @@ public static JSONArray convert(ResultSet rs) throws SQLException,
 		            } else if (rsmd.getColumnType(i) == java.sql.Types.JAVA_OBJECT) {
 		                obj.put(column_name, rs.getObject(column_name));
 		            } else {
-		                obj.put(column_name, rs.getString(i));
+		            	obj.put(column_name, rs.getString(i));
+		            	 
 		            }
 		        }		
 		        json.add(obj);        
